@@ -9,7 +9,12 @@ function translate(fileName, source, target) {
   return axios.get(BASE_URL + `/translate/${fileName}/${source}/${target}`);
 }
 
+function downloadWav(fileName, url) {
+  return axios.post(BASE_URL + `/downloadWav/${fileName}`, {url});
+}
+
 export {
   testCallAPI,
-  translate
+  translate,
+  downloadWav
 }

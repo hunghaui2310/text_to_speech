@@ -5,7 +5,8 @@ import {CloseOutlined, DownloadOutlined, CheckOutlined, RightOutlined} from '@an
 import {BASE_URL, downloadFile, getFile, uploadFile} from "../services/UploadService";
 import logoPPT from '../assets/images/ppt-icon-499.png';
 import axios from "axios";
-import {translate} from "../services/TranslateService";
+import {downloadWav, translate} from "../services/TranslateService";
+import {createWavFromText} from "../services/ExternalService";
 
 const dataCountries = require('../assets/data/data2.json');
 const BASE_DOWNLOAD_URL = BASE_URL + '/media/origin/';
@@ -30,15 +31,22 @@ const UploadFile = () => {
       const fileName = fileResponse.file.replace(BASE_DOWNLOAD_URL, '');
       setTranslating(true);
       translate(fileName, langSource, langDestination).then(res => {
-        setTranslating(false);
-        setSuccessFiles([...successFiles, {
-          id: fileResponse.id,
-          name: decodeURI(res.data),
-          isDownloaded: false
-        }]);
+        if (!res || !res.data) return;
+        const text = decodeURI(res.data.text);
+        createWavFromText(text).then((resp) => {
+          if (!resp || !resp.body) return;
+          const url = resp.body.wavFilePath;
+          downloadWav(res.data.file_name, url).then((resp1) => {
+             setTranslating(false);
+             message.success(`${fileName} success.`);
+          })
+        }).catch(err1 => {
+          setTranslating(false);
+          message.error(`${fileName} failed.`);
+        })
       }).catch(err => {
         setTranslating(false);
-        message.error(`${fileName} file translate failed.`);
+        message.error(`${fileName} failed.`);
       })
     }
   };
@@ -106,7 +114,7 @@ const UploadFile = () => {
         </div>
         <Dragger
           {...props}
-          accept=".ppt, .pptx"
+          accept=".doc, .docx"
           className="upload-result w-100"
         >
           <p className="ant-upload-drag-icon">
@@ -114,7 +122,7 @@ const UploadFile = () => {
           </p>
           <p className="ant-upload-text">Click or drag file to this area to upload</p>
           <p className="ant-upload-hint">
-            Document Files Supported: PPT, PPTX<br/>(Max size = 100MB)
+            Document Files Supported: DOC, DOCX<br/>
           </p>
         </Dragger>
       </div>

@@ -72,6 +72,4 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/t
 
 Backend require
 pipenv install djangorestframework django-cors-headers
-pip3 install requests
-pip3 install python-pptx
-python3 -m pip install python-pptx-text-replacer
+pip install urllib3
