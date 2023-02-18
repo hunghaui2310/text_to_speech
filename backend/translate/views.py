@@ -11,11 +11,18 @@ from urllib.parse import unquote
 from django.http import JsonResponse
 import docx
 import os
-import json
+import requests
+from docx import Document
+import time
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 folder_name_origin = 'origin'
 folder_name_split = 'split'
 folder_name_wav = 'wav'
+folder_name_docx = 'docx'
+MEDIA_EXTERNAL = 'C:\\Users\\hungh\\OneDrive\\Desktop\\media'
 
 
 # Create your views here.
@@ -30,17 +37,25 @@ def translate(request, file_name, source, target):
 
 
 @api_view(['POST'])
-def download_wav(request, file_name):
-    create_folder_if_not_exist(folder_name_wav)  # to save file wav
+def download_wav(request, file_name, folder_name):
+    # create_folder_if_not_exist(folder_name_wav)  # to save file wav
     file_path = request.data['url'][14:]
-    filename, file_extension = os.path.splitext(file_name)
-    urllib.request.urlretrieve("http://studio.ploonet.com/" + file_path,  settings.MEDIA_ROOT + '/' + folder_name_wav + '/' + filename + ".wav")
+    urllib.request.urlretrieve("http://studio.ploonet.com/" + file_path,
+                               MEDIA_EXTERNAL + '/' + folder_name + '/' + file_name + ".wav")
     return Response('Success')
+
+
+@api_view(['POST'])
+def extract_url(request):
+    url = request.data['url']
+    text_obj = extract_text_from_url(url)
+    return JsonResponse({'text': unquote(text_obj['text']), 'title': unquote(text_obj['title']),
+                         'fileName': unquote(text_obj['file_name'])})
 
 
 @api_view(['GET'])
 def download(request, file_name):
-    file_path = settings.MEDIA_ROOT + '/translated/' + unquote(file_name)
+    file_path = MEDIA_EXTERNAL + '/translated/' + unquote(file_name)
     file_pointer = open(file_path, 'r')
     response = Response(file_pointer,
                         content_type='application/vnd.openxmlformats-officedocument.presentationml.presentation')
@@ -48,22 +63,51 @@ def download(request, file_name):
     return response
 
 
+def extract_text_from_url(url):
+    response = requests.get('http://13.21.34.201:8989/parser?url=' + url)
+    if response.ok:
+        text = response.json()['textContent']
+        title = response.json()['title']
+        image = response.json()['lead_image_url']
+        return write_text_to_doc(text, title, url, image)
+    return ''
+
+
+def write_text_to_doc(texts, title, url, image):
+    file_name = time.strftime("%Y%m%d-%H%M%S")
+    create_folder_if_not_exist(file_name)
+    # save image
+    filename, file_extension = os.path.splitext(image)
+    urllib.request.urlretrieve(image,
+                               MEDIA_EXTERNAL + '/' + file_name + '/' + file_name + file_extension)
+    document = Document()
+    document.add_heading(title, level=1)
+    document.add_heading('Source: ' + url, level=2)
+    text_out = ''
+    for text in texts.strip().split('.'):
+        text_out += text.strip() + '.\n'
+    document.add_paragraph(text_out)
+    document.save(MEDIA_EXTERNAL + '/' + file_name + '/' + file_name + '.docx')
+    return {'title': title, 'text': text_out, 'file_name': file_name}
+
+
 def save_text_to_file(file_name, text):
     prefix_file_name = os.path.splitext(file_name)[0]
     # save file to temp folder in media folder
-    file_path = settings.MEDIA_ROOT
+    file_path = MEDIA_EXTERNAL
     with open(file_path + '/temp/' + prefix_file_name + '.txt', "a") as myfile:
         myfile.write(text.strip() + "\n")
 
 
 def create_folder_if_not_exist(folder_name):
     # crete folder if not exist in media folder
-    if not os.path.exists(settings.MEDIA_ROOT + "/" + folder_name):
-        os.mkdir(settings.MEDIA_ROOT + "/" + folder_name)
+    print('======================== path = ' + MEDIA_EXTERNAL)
+    if not os.path.exists(MEDIA_EXTERNAL + "/" + folder_name):
+        os.mkdir(MEDIA_EXTERNAL + "/" + folder_name)
 
 
 def split_text(file_name):
-    file_path = settings.MEDIA_ROOT
+    file_path = MEDIA_EXTERNAL
     file_origin_path = file_path + '/' + folder_name_origin + '/' + file_name
     doc = docx.Document(file_origin_path)
 
@@ -78,10 +122,6 @@ def split_text(file_name):
                 texts += p.text
                 myfile.write(p.text.strip())
     return texts
-
-
-def download_file(file_path, name):
-    urllib.request.urlretrieve("http://studio.ploonet.com/" + file_path, name + ".wav")
 
 class TodoView(viewsets.ModelViewSet):
     serializer_class = TodoSerializer

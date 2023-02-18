@@ -1,14 +1,13 @@
 import React from 'react';
-import Statistic from "./Statistic";
 import UploadFile from "./UploadFile";
-import Welcome from "./Welcome";
 import './custom-component.css';
+import {LinkDownload} from "./LinkDownload";
 
 const Container = () => {
 
   return (
     <div className="container">
-      <Welcome/>
+      <LinkDownload/>
       <UploadFile/>
       {/*<Statistic/>*/}
       <div className="pt-100"/>
